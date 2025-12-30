@@ -167,6 +167,9 @@ export default function GalleryView({ photos, categories }: GalleryViewProps) {
     setSelected({ photo, originRect: rect, openedAt: Date.now(), index });
     setExitRect(null); // Reset exit rect when opening
     document.body.style.overflow = "hidden";
+
+    // Update URL with photo ID
+    window.history.pushState({ photoId: photo.id }, "", `/gallery/${photo.id}`);
   };
 
   // Get rect of current photo's grid item, scrolling if needed
@@ -200,6 +203,9 @@ export default function GalleryView({ photos, categories }: GalleryViewProps) {
       }
     }
 
+    // Restore URL to /gallery
+    window.history.pushState({}, "", "/gallery");
+
     // Small delay to allow exitRect to be set before closing
     requestAnimationFrame(() => {
       setSelected(null);
@@ -224,12 +230,90 @@ export default function GalleryView({ photos, categories }: GalleryViewProps) {
       setVisibleCount(Math.min(newIndex + BATCH_SIZE, filteredPhotos.length));
     }
 
+    // Update URL with new photo ID (replaceState to avoid history spam)
+    window.history.replaceState({ photoId: newPhoto.id }, "", `/gallery/${newPhoto.id}`);
+
     setSelected((prev) => prev ? {
       ...prev,
       photo: newPhoto,
       index: newIndex,
     } : null);
   }, [selected, filteredPhotos, visibleCount]);
+
+  // Open photo from URL on mount (deep linking support)
+  useEffect(() => {
+    const path = window.location.pathname;
+    const match = path.match(/^\/gallery\/([^/]+)$/);
+
+    if (match) {
+      const photoId = match[1];
+      // Find photo by ID in all photos (not just filtered)
+      const photo = photos.find((p) => p.id === photoId);
+
+      if (photo) {
+        // Find index in filtered photos
+        const index = filteredPhotos.findIndex((p) => p.id === photoId);
+
+        // Ensure photo is loaded in visible photos
+        if (index >= visibleCount) {
+          setVisibleCount(Math.min(index + BATCH_SIZE, filteredPhotos.length));
+        }
+
+        // Open lightbox without animation (no origin rect available on direct access)
+        // Use a placeholder rect at center of screen
+        const centerRect = new DOMRect(
+          window.innerWidth / 2 - 100,
+          window.innerHeight / 2 - 100,
+          200,
+          200
+        );
+
+        setSelected({
+          photo,
+          originRect: centerRect,
+          openedAt: Date.now(),
+          index: index >= 0 ? index : 0,
+        });
+        document.body.style.overflow = "hidden";
+      }
+    }
+    // Only run on mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Handle browser back/forward button
+  useEffect(() => {
+    const handlePopState = (event: PopStateEvent) => {
+      if (event.state?.photoId) {
+        // Navigate to photo from history state
+        const photo = photos.find((p) => p.id === event.state.photoId);
+        if (photo) {
+          const index = filteredPhotos.findIndex((p) => p.id === event.state.photoId);
+          const centerRect = new DOMRect(
+            window.innerWidth / 2 - 100,
+            window.innerHeight / 2 - 100,
+            200,
+            200
+          );
+
+          setSelected({
+            photo,
+            originRect: centerRect,
+            openedAt: Date.now(),
+            index: index >= 0 ? index : 0,
+          });
+          document.body.style.overflow = "hidden";
+        }
+      } else {
+        // No photo in state - close lightbox
+        setSelected(null);
+        document.body.style.overflow = "";
+      }
+    };
+
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, [photos, filteredPhotos]);
 
   // Get display label for current view
   const displayLabel = selectedCategory
