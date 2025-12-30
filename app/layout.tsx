@@ -53,6 +53,11 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
+      <head>
+        {/* Preconnect to Uploadthing CDN for faster image loading */}
+        <link rel="preconnect" href="https://utfs.io" crossOrigin="anonymous" />
+        <link rel="dns-prefetch" href="https://utfs.io" />
+      </head>
       <body
         className={`${aileron.variable} ${inter.variable} ${cormorant.variable} antialiased bg-background text-foreground`}
       >
