@@ -269,18 +269,6 @@ export default function Lightbox({
           </>
         )}
 
-        {/* Swipe indicator for mobile */}
-        {isMobile && (hasPrev || hasNext) && (
-          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2">
-            {hasPrev && (
-              <div className="w-8 h-1 bg-white/40 rounded-full" />
-            )}
-            <div className="w-8 h-1 bg-white rounded-full" />
-            {hasNext && (
-              <div className="w-8 h-1 bg-white/40 rounded-full" />
-            )}
-          </div>
-        )}
       </motion.div>
 
       {/* Close hint */}
