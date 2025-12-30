@@ -8,19 +8,15 @@ export const BREAKPOINTS = {
 } as const;
 
 /**
- * Gets variant with URL and dimensions based on viewport width
+ * Gets variant with URL and dimensions based on viewport width.
+ * Note: Mobile devices use tablet variant for better image quality
+ * (mobile variant was too small/blurry on high-DPI phone screens).
  */
 export function getResponsiveVariant(
   photo: PhotoManifest,
   width: number
 ): { url: string; width: number; height: number } {
-  if (width <= BREAKPOINTS.mobile && photo.variants.mobile?.url) {
-    return {
-      url: photo.variants.mobile.url,
-      width: photo.variants.mobile.width,
-      height: photo.variants.mobile.height,
-    };
-  }
+  // Mobile and tablet both use tablet variant for better quality on high-DPI screens
   if (width <= BREAKPOINTS.tablet && photo.variants.tablet?.url) {
     return {
       url: photo.variants.tablet.url,
