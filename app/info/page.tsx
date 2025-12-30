@@ -85,11 +85,19 @@ export default async function InfoPage() {
             <h2 className="text-white text-xl sm:text-2xl font-light tracking-[0.1em]">
               Our Story
             </h2>
-            <p className="text-white/70 text-base sm:text-lg font-light leading-relaxed">
-              This site was created to preserve the cherished memories of our
-              wedding day and to celebrate the wonderful people who shared in
-              our joy. Thank you for being part of our story.
-            </p>
+            <div className="text-white/70 text-base sm:text-lg font-light leading-relaxed space-y-4">
+              <p>
+                Our wedding took place in 2017 at Provenance in Matua Valley, a
+                beautiful venue that has since closed its doors. With the help
+                of so many wonderful people, we celebrated a day filled with
+                love, laughter, and unforgettable moments.
+              </p>
+              <p>
+                This site was created to preserve those cherished memories and
+                to honor everyone who made our special day possible. Thank you
+                for being part of our story.
+              </p>
+            </div>
           </section>
 
           {/* Divider */}
@@ -117,7 +125,7 @@ export default async function InfoPage() {
               Built With
             </h2>
             <p className="text-white/70 text-base sm:text-lg font-light leading-relaxed">
-              This website was crafted with love using modern web technologies.
+              This website was crafted with the following technologies.
             </p>
             <div className="flex flex-wrap justify-center gap-3 pt-2">
               {[
@@ -171,10 +179,59 @@ export default async function InfoPage() {
             </p>
           </section>
 
+          {/* Divider */}
+          <div className="border-t border-white/10" />
+
+          {/* Contact Section */}
+          <section className="text-center space-y-6">
+            <div className="w-12 h-12 mx-auto rounded-full bg-white/5 flex items-center justify-center">
+              <svg
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="text-white/60"
+              >
+                <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
+                <polyline points="22,6 12,13 2,6" />
+              </svg>
+            </div>
+            <h2 className="text-white text-xl sm:text-2xl font-light tracking-[0.1em]">
+              Contact
+            </h2>
+            <div className="text-white/70 text-base sm:text-lg font-light leading-relaxed space-y-4">
+              <p>
+                This is an open source project. All code is available on{" "}
+                <a
+                  href="https://github.com/hcho112/the-wedding"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-white/90 underline underline-offset-4 hover:text-white transition-colors"
+                >
+                  GitHub
+                </a>{" "}
+                under the MIT license. (Photos are not included in this license.)
+              </p>
+              <p>
+                Feel free to create issues on GitHub or reach out via email at{" "}
+                <a
+                  href="mailto:devment0129@gmail.com"
+                  className="text-white/90 underline underline-offset-4 hover:text-white transition-colors"
+                >
+                  devment0129@gmail.com
+                </a>
+              </p>
+            </div>
+          </section>
+
           {/* Footer */}
           <footer className="pt-8 border-t border-white/10 text-center">
             <p className="text-white/40 text-sm font-light">
-              Made with love, 2024
+              Made in Dec 2025
             </p>
           </footer>
         </div>

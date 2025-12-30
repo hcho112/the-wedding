@@ -42,7 +42,7 @@ export default async function Home() {
               Jacqui & Danny
             </h1>
             <p className="text-lg md:text-xl lg:text-2xl font-light tracking-[0.3em] uppercase">
-              The Wedding
+              The Wedding 2017
             </p>
           </div>
         </div>
