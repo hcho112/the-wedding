@@ -38,3 +38,10 @@ next-env.d.ts
 raw-photos/
 optimized-photos/
 *-optimized/
+
+# Development artifacts (scripts generate these)
+/image-manifest.json
+/photo-metadata.json
+
+# Claude Code local settings
+.claude/
