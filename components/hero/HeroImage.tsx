@@ -1,9 +1,8 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import Image from "next/image";
 import type { PhotoManifest } from "@/types";
-import { getResponsiveVariant, BREAKPOINTS } from "@/lib/gallery";
 import { markImageLoaded, isImageLoaded } from "@/lib/image-cache";
 
 type HeroImageProps = {
@@ -12,93 +11,41 @@ type HeroImageProps = {
   className?: string;
 };
 
-/**
- * Find a cached variant URL from the photo, checking all variants
- */
-function findCachedVariant(photo: PhotoManifest): { url: string; width: number; height: number } | null {
-  const variantKeys = ["mobile", "tablet", "desktop", "full"] as const;
-
-  for (const key of variantKeys) {
-    const variant = photo.variants[key];
-    if (variant?.url && isImageLoaded(variant.url)) {
-      return { url: variant.url, width: variant.width, height: variant.height };
-    }
-  }
-
-  if (isImageLoaded(photo.url)) {
-    return { url: photo.url, width: photo.width, height: photo.height };
-  }
-
-  return null;
-}
-
 export default function HeroImage({
   photo,
   alt = "Hero Image",
   className = "",
 }: HeroImageProps) {
-  const [hasMounted, setHasMounted] = useState(false);
-  const [viewportWidth, setViewportWidth] = useState<number>(1920);
-  const lockedVariantRef = useRef<{ url: string; width: number; height: number } | null>(null);
+  // Start with blur to match server render (avoids hydration mismatch)
+  const [showCached, setShowCached] = useState(false);
 
+  // Hero image always uses desktop variant for maximum quality
+  const desktopVariant = photo?.variants.desktop;
+  const variant = desktopVariant?.url
+    ? { url: desktopVariant.url, width: desktopVariant.width, height: desktopVariant.height }
+    : photo
+      ? { url: photo.url, width: photo.width, height: photo.height }
+      : null;
+
+  // After hydration, check if image is cached (for SPA navigation)
   useEffect(() => {
-    setViewportWidth(window.innerWidth);
-    setHasMounted(true);
-
-    function handleResize() {
-      setViewportWidth(window.innerWidth);
+    if (variant && isImageLoaded(variant.url)) {
+      setShowCached(true);
     }
+  }, [variant]);
 
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
-  }, []);
-
-  if (!photo) {
+  if (!photo || !variant) {
     return null;
-  }
-
-  // Determine the variant to use
-  let variant: { url: string; width: number; height: number };
-  let isCached = false;
-
-  if (lockedVariantRef.current) {
-    variant = lockedVariantRef.current;
-    // Check cache status for the locked variant
-    isCached = isImageLoaded(variant.url);
-  } else {
-    const cachedVariant = findCachedVariant(photo);
-
-    if (cachedVariant) {
-      variant = cachedVariant;
-      isCached = true;
-      lockedVariantRef.current = variant;
-    } else if (hasMounted) {
-      variant = getResponsiveVariant(photo, viewportWidth);
-      lockedVariantRef.current = variant;
-    } else {
-      // SSR/initial render: use full variant
-      variant = { url: photo.variants.full?.url || photo.url, width: photo.width, height: photo.height };
-    }
   }
 
   const handleLoad = () => {
     markImageLoaded(variant.url);
-    lockedVariantRef.current = variant;
+    setShowCached(true);
   };
 
-  // SOLUTION: Use CSS background-image as INSTANT fallback
-  //
-  // Problem: Next.js Image takes time to initialize even for cached images.
-  // During this time, showing nothing = black flash, showing blur = blur flash.
-  //
-  // Solution: CSS background-image uses browser's HTTP cache and renders INSTANTLY.
-  // - For cached images: CSS shows the real image immediately
-  // - For non-cached images: CSS shows blur immediately
-  // - Next.js Image renders on top once it's ready (provides optimization benefits)
-  //
-  // This eliminates BOTH black flash AND unnecessary blur flash.
-
-  const backgroundUrl = isCached ? variant.url : photo.blurDataUrl;
+  // Use cached high-res as background if available (SPA navigation),
+  // otherwise use blur placeholder (initial load / page refresh)
+  const backgroundUrl = showCached ? variant.url : photo.blurDataUrl;
 
   return (
     <div
@@ -116,7 +63,7 @@ export default function HeroImage({
         className={className}
         priority
         placeholder="empty"
-        sizes={`(max-width: ${BREAKPOINTS.mobile}px) 100vw, (max-width: ${BREAKPOINTS.tablet}px) 100vw, 100vw`}
+        sizes="100vw"
         unoptimized
         onLoad={handleLoad}
       />
