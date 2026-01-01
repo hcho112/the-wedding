@@ -17,6 +17,7 @@ type SelectedState = {
   originRect: DOMRect;
   openedAt: number; // Timestamp to force re-mount on each click
   index: number; // Index in filteredPhotos for navigation
+  openedViaClick: boolean; // Track if opened via user click (vs deep link/popstate)
 } | null;
 
 type CategoryBoundary = {
@@ -164,7 +165,7 @@ export default function GalleryView({ photos, categories }: GalleryViewProps) {
   // Handle lightbox open
   const handlePhotoClick = (photo: PhotoManifest, rect: DOMRect) => {
     const index = filteredPhotos.findIndex((p) => p.url === photo.url);
-    setSelected({ photo, originRect: rect, openedAt: Date.now(), index });
+    setSelected({ photo, originRect: rect, openedAt: Date.now(), index, openedViaClick: true });
     setExitRect(null); // Reset exit rect when opening
     document.body.style.overflow = "hidden";
 
@@ -201,10 +202,16 @@ export default function GalleryView({ photos, categories }: GalleryViewProps) {
       if (rect) {
         setExitRect(rect);
       }
-    }
 
-    // Restore URL to /gallery
-    window.history.pushState({}, "", "/gallery");
+      // Handle URL based on how lightbox was opened
+      if (selected.openedViaClick) {
+        // Opened via click (pushed history) → go back to pop the entry
+        window.history.back();
+      } else {
+        // Opened via deep link or popstate → replace URL without adding history
+        window.history.replaceState({}, "", "/gallery");
+      }
+    }
 
     // Small delay to allow exitRect to be set before closing
     requestAnimationFrame(() => {
@@ -273,6 +280,7 @@ export default function GalleryView({ photos, categories }: GalleryViewProps) {
           originRect: centerRect,
           openedAt: Date.now(),
           index: index >= 0 ? index : 0,
+          openedViaClick: false, // Deep link - don't use history.back() on close
         });
         document.body.style.overflow = "hidden";
       }
@@ -285,7 +293,7 @@ export default function GalleryView({ photos, categories }: GalleryViewProps) {
   useEffect(() => {
     const handlePopState = (event: PopStateEvent) => {
       if (event.state?.photoId) {
-        // Navigate to photo from history state
+        // Navigate to photo from history state (forward button)
         const photo = photos.find((p) => p.id === event.state.photoId);
         if (photo) {
           const index = filteredPhotos.findIndex((p) => p.id === event.state.photoId);
@@ -301,11 +309,12 @@ export default function GalleryView({ photos, categories }: GalleryViewProps) {
             originRect: centerRect,
             openedAt: Date.now(),
             index: index >= 0 ? index : 0,
+            openedViaClick: false, // Opened via history navigation
           });
           document.body.style.overflow = "hidden";
         }
       } else {
-        // No photo in state - close lightbox
+        // No photo in state - close lightbox (back button pressed)
         setSelected(null);
         document.body.style.overflow = "";
       }
