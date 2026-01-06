@@ -13,7 +13,10 @@ type BridalPartySectionProps = {
   members: PersonContour[];
 };
 
-export default function BridalPartySection({ photo, members }: BridalPartySectionProps) {
+export default function BridalPartySection({
+  photo,
+  members,
+}: BridalPartySectionProps) {
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [isMobile, setIsMobile] = useState(false);
 
@@ -78,21 +81,29 @@ export default function BridalPartySection({ photo, members }: BridalPartySectio
         {/* Name Tag - Rendered outside SVG for better styling */}
         <AnimatePresence>
           {hoveredMember && (
-            <motion.div
+            <div
               key={hoveredMember.id}
               className="absolute pointer-events-none z-20"
               style={{
                 left: `${hoveredMember.nameTagAnchor.x * 100}%`,
                 top: `${hoveredMember.nameTagAnchor.y * 100}%`,
-                transform: "translate(-50%, -100%)",
               }}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -5 }}
-              transition={{ duration: 0.2 }}
             >
-              <NameTag name={hoveredMember.name} role={hoveredMember.role} />
-            </motion.div>
+              {/* Offset wrapper - positions tooltip above the anchor point */}
+              <div
+                className="relative"
+                style={{ transform: "translate(-50%, calc(-100% - 16px))" }}
+              >
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -5 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  <NameTag name={hoveredMember.name} role={hoveredMember.role} />
+                </motion.div>
+              </div>
+            </div>
           )}
         </AnimatePresence>
       </div>
