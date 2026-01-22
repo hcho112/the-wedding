@@ -40,7 +40,7 @@ export default function GalleryView({
   initialPhotoId,
 }: GalleryViewProps) {
   const router = useRouter();
-  const { switchToCategory, pause } = useAudio();
+  const { switchToCategory, stopAudio } = useAudio();
   const [selected, setSelected] = useState<SelectedState>(null);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(
     initialCategory || null
@@ -85,16 +85,16 @@ export default function GalleryView({
     return boundaries;
   }, [visiblePhotos, selectedCategory]);
 
-  // Store pause function in ref for cleanup
-  const pauseRef = useRef(pause);
+  // Store stopAudio function in ref for cleanup
+  const stopAudioRef = useRef(stopAudio);
   useEffect(() => {
-    pauseRef.current = pause;
-  }, [pause]);
+    stopAudioRef.current = stopAudio;
+  }, [stopAudio]);
 
-  // Stop audio when leaving the gallery
+  // Stop audio when leaving the gallery (uses stopAudio to avoid setting userPaused flag)
   useEffect(() => {
     return () => {
-      pauseRef.current();
+      stopAudioRef.current();
     };
   }, []);
 
