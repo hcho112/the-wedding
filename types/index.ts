@@ -57,3 +57,18 @@ export type BridalPartyData = {
     photoId: string;
     members: PersonContour[];
 };
+
+// Sound Manifest Types
+export type SoundTrack = {
+    id: string;
+    title: string;
+    category: string;       // Maps to photo category (e.g., "Preparation 10AM")
+    filename: string;       // Original filename
+    url?: string;           // Remote URL after upload
+    duration?: number;      // Duration in seconds (if available)
+};
+
+export type SoundManifest = {
+    defaultTrack: string;   // ID of the default track
+    tracks: SoundTrack[];
+};

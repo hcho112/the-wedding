@@ -1,15 +1,21 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import { AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import type { PhotoManifest } from "@/types";
+import { categoryToSlug, buildCategoryUrl, buildPhotoUrl } from "@/lib/gallery-utils";
+import { useAudio } from "@/context/AudioContext";
 import GalleryGrid from "./GalleryGrid";
 import Lightbox from "./Lightbox";
+import AudioPlayer from "@/components/audio/AudioPlayer";
 
 type GalleryViewProps = {
   photos: PhotoManifest[];
   categories: string[];
+  initialCategory?: string;
+  initialPhotoId?: string;
 };
 
 type SelectedState = {
@@ -27,9 +33,18 @@ type CategoryBoundary = {
 
 const BATCH_SIZE = 30;
 
-export default function GalleryView({ photos, categories }: GalleryViewProps) {
+export default function GalleryView({
+  photos,
+  categories,
+  initialCategory,
+  initialPhotoId,
+}: GalleryViewProps) {
+  const router = useRouter();
+  const { switchToCategory, pause } = useAudio();
   const [selected, setSelected] = useState<SelectedState>(null);
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(
+    initialCategory || null
+  );
   const [visibleCategory, setVisibleCategory] = useState<string | null>(null);
   const [visibleCount, setVisibleCount] = useState(BATCH_SIZE);
   const [exitRect, setExitRect] = useState<DOMRect | null>(null);
@@ -37,6 +52,12 @@ export default function GalleryView({ photos, categories }: GalleryViewProps) {
   const categoryObserverRef = useRef<IntersectionObserver | null>(null);
   const sentinelElementsRef = useRef<Map<string, HTMLDivElement>>(new Map());
   const photoRefsRef = useRef<Map<string, HTMLDivElement>>(new Map());
+  const initializedRef = useRef(false);
+
+  // Get current category slug for URL building
+  const currentCategorySlug = selectedCategory
+    ? categoryToSlug(selectedCategory)
+    : undefined;
 
   // Filter photos by category
   const filteredPhotos = selectedCategory
@@ -63,6 +84,41 @@ export default function GalleryView({ photos, categories }: GalleryViewProps) {
 
     return boundaries;
   }, [visiblePhotos, selectedCategory]);
+
+  // Store pause function in ref for cleanup
+  const pauseRef = useRef(pause);
+  useEffect(() => {
+    pauseRef.current = pause;
+  }, [pause]);
+
+  // Stop audio when leaving the gallery
+  useEffect(() => {
+    return () => {
+      pauseRef.current();
+    };
+  }, []);
+
+  // Initialize audio: start with Preparation (first category) on mount
+  useEffect(() => {
+    if (categories.length > 0) {
+      const initialCat = initialCategory || categories[0];
+      switchToCategory(initialCat);
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Switch audio when scrolling changes visible category (All view only)
+  useEffect(() => {
+    if (!selectedCategory && visibleCategory) {
+      switchToCategory(visibleCategory);
+    }
+  }, [visibleCategory, selectedCategory, switchToCategory]);
+
+  // Switch audio when tab changes
+  useEffect(() => {
+    if (selectedCategory) {
+      switchToCategory(selectedCategory);
+    }
+  }, [selectedCategory, switchToCategory]);
 
   // Initialize visible category to first category
   useEffect(() => {
@@ -112,31 +168,39 @@ export default function GalleryView({ photos, categories }: GalleryViewProps) {
   }, [selectedCategory, categoryBoundaries]);
 
   // Callback to register category sentinels
-  const registerSentinel = useCallback((category: string, element: HTMLDivElement | null) => {
-    if (element) {
-      sentinelElementsRef.current.set(category, element);
-      categoryObserverRef.current?.observe(element);
-    } else {
-      const existing = sentinelElementsRef.current.get(category);
-      if (existing) {
-        categoryObserverRef.current?.unobserve(existing);
-        sentinelElementsRef.current.delete(category);
+  const registerSentinel = useCallback(
+    (category: string, element: HTMLDivElement | null) => {
+      if (element) {
+        sentinelElementsRef.current.set(category, element);
+        categoryObserverRef.current?.observe(element);
+      } else {
+        const existing = sentinelElementsRef.current.get(category);
+        if (existing) {
+          categoryObserverRef.current?.unobserve(existing);
+          sentinelElementsRef.current.delete(category);
+        }
       }
-    }
-  }, []);
+    },
+    []
+  );
 
   // Callback to register photo element refs
-  const registerPhotoRef = useCallback((photoUrl: string, element: HTMLDivElement | null) => {
-    if (element) {
-      photoRefsRef.current.set(photoUrl, element);
-    } else {
-      photoRefsRef.current.delete(photoUrl);
-    }
-  }, []);
+  const registerPhotoRef = useCallback(
+    (photoUrl: string, element: HTMLDivElement | null) => {
+      if (element) {
+        photoRefsRef.current.set(photoUrl, element);
+      } else {
+        photoRefsRef.current.delete(photoUrl);
+      }
+    },
+    []
+  );
 
   // Load more when sentinel enters viewport
   const loadMore = useCallback(() => {
-    setVisibleCount((prev) => Math.min(prev + BATCH_SIZE, filteredPhotos.length));
+    setVisibleCount((prev) =>
+      Math.min(prev + BATCH_SIZE, filteredPhotos.length)
+    );
   }, [filteredPhotos.length]);
 
   // Reset visible count when category changes
@@ -162,16 +226,37 @@ export default function GalleryView({ photos, categories }: GalleryViewProps) {
     return () => observer.disconnect();
   }, [hasMore, loadMore]);
 
-  // Handle lightbox open
-  const handlePhotoClick = (photo: PhotoManifest, rect: DOMRect) => {
-    const index = filteredPhotos.findIndex((p) => p.url === photo.url);
-    setSelected({ photo, originRect: rect, openedAt: Date.now(), index, openedViaClick: true });
-    setExitRect(null); // Reset exit rect when opening
-    document.body.style.overflow = "hidden";
+  // Handle category change with URL update
+  const handleCategoryChange = useCallback(
+    (category: string | null) => {
+      setSelectedCategory(category);
+      const slug = category ? categoryToSlug(category) : undefined;
+      const url = buildCategoryUrl(slug);
+      router.push(url);
+    },
+    [router]
+  );
 
-    // Update URL with photo ID
-    window.history.pushState({ photoId: photo.id }, "", `/gallery/${photo.id}`);
-  };
+  // Handle lightbox open
+  const handlePhotoClick = useCallback(
+    (photo: PhotoManifest, rect: DOMRect) => {
+      const index = filteredPhotos.findIndex((p) => p.url === photo.url);
+      setSelected({
+        photo,
+        originRect: rect,
+        openedAt: Date.now(),
+        index,
+        openedViaClick: true,
+      });
+      setExitRect(null); // Reset exit rect when opening
+
+      // Update URL with category-aware photo path
+      const url = buildPhotoUrl(photo.id, currentCategorySlug);
+      window.history.pushState({ photoId: photo.id, category: selectedCategory }, "", url);
+      document.body.style.overflow = "hidden";
+    },
+    [filteredPhotos, currentCategorySlug, selectedCategory]
+  );
 
   // Get rect of current photo's grid item, scrolling if needed
   const getPhotoRect = useCallback((photo: PhotoManifest): DOMRect | null => {
@@ -208,8 +293,9 @@ export default function GalleryView({ photos, categories }: GalleryViewProps) {
         // Opened via click (pushed history) → go back to pop the entry
         window.history.back();
       } else {
-        // Opened via deep link or popstate → replace URL without adding history
-        window.history.replaceState({}, "", "/gallery");
+        // Opened via deep link or popstate → replace URL to category view
+        const url = buildCategoryUrl(currentCategorySlug);
+        window.history.replaceState({}, "", url);
       }
     }
 
@@ -218,48 +304,52 @@ export default function GalleryView({ photos, categories }: GalleryViewProps) {
       setSelected(null);
       document.body.style.overflow = "";
     });
-  }, [selected, getPhotoRect]);
+  }, [selected, getPhotoRect, currentCategorySlug]);
 
   // Handle lightbox navigation
-  const handleNavigate = useCallback((direction: "prev" | "next") => {
-    if (!selected) return;
+  const handleNavigate = useCallback(
+    (direction: "prev" | "next") => {
+      if (!selected) return;
 
-    const newIndex = direction === "next"
-      ? selected.index + 1
-      : selected.index - 1;
+      const newIndex =
+        direction === "next" ? selected.index + 1 : selected.index - 1;
 
-    if (newIndex < 0 || newIndex >= filteredPhotos.length) return;
+      if (newIndex < 0 || newIndex >= filteredPhotos.length) return;
 
-    const newPhoto = filteredPhotos[newIndex];
+      const newPhoto = filteredPhotos[newIndex];
 
-    // Ensure the new photo is loaded in the grid (expand visibleCount if needed)
-    if (newIndex >= visibleCount) {
-      setVisibleCount(Math.min(newIndex + BATCH_SIZE, filteredPhotos.length));
-    }
+      // Ensure the new photo is loaded in the grid (expand visibleCount if needed)
+      if (newIndex >= visibleCount) {
+        setVisibleCount(Math.min(newIndex + BATCH_SIZE, filteredPhotos.length));
+      }
 
-    // Update URL with new photo ID (replaceState to avoid history spam)
-    window.history.replaceState({ photoId: newPhoto.id }, "", `/gallery/${newPhoto.id}`);
+      // Update URL with new photo ID (replaceState to avoid history spam)
+      const url = buildPhotoUrl(newPhoto.id, currentCategorySlug);
+      window.history.replaceState({ photoId: newPhoto.id, category: selectedCategory }, "", url);
 
-    setSelected((prev) => prev ? {
-      ...prev,
-      photo: newPhoto,
-      index: newIndex,
-    } : null);
-  }, [selected, filteredPhotos, visibleCount]);
+      setSelected((prev) =>
+        prev
+          ? {
+              ...prev,
+              photo: newPhoto,
+              index: newIndex,
+            }
+          : null
+      );
+    },
+    [selected, filteredPhotos, visibleCount, currentCategorySlug, selectedCategory]
+  );
 
-  // Open photo from URL on mount (deep linking support)
+  // Open photo from initialPhotoId prop (deep linking support)
   useEffect(() => {
-    const path = window.location.pathname;
-    const match = path.match(/^\/gallery\/([^/]+)$/);
+    if (initializedRef.current) return;
 
-    if (match) {
-      const photoId = match[1];
-      // Find photo by ID in all photos (not just filtered)
-      const photo = photos.find((p) => p.id === photoId);
+    if (initialPhotoId) {
+      const photo = photos.find((p) => p.id === initialPhotoId);
 
       if (photo) {
         // Find index in filtered photos
-        const index = filteredPhotos.findIndex((p) => p.id === photoId);
+        const index = filteredPhotos.findIndex((p) => p.id === initialPhotoId);
 
         // Ensure photo is loaded in visible photos
         if (index >= visibleCount) {
@@ -285,9 +375,9 @@ export default function GalleryView({ photos, categories }: GalleryViewProps) {
         document.body.style.overflow = "hidden";
       }
     }
-    // Only run on mount
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+
+    initializedRef.current = true;
+  }, [initialPhotoId, photos, filteredPhotos, visibleCount]);
 
   // Handle browser back/forward button
   useEffect(() => {
@@ -296,7 +386,9 @@ export default function GalleryView({ photos, categories }: GalleryViewProps) {
         // Navigate to photo from history state (forward button)
         const photo = photos.find((p) => p.id === event.state.photoId);
         if (photo) {
-          const index = filteredPhotos.findIndex((p) => p.id === event.state.photoId);
+          const index = filteredPhotos.findIndex(
+            (p) => p.id === event.state.photoId
+          );
           const centerRect = new DOMRect(
             window.innerWidth / 2 - 100,
             window.innerHeight / 2 - 100,
@@ -332,9 +424,9 @@ export default function GalleryView({ photos, categories }: GalleryViewProps) {
   return (
     <div className="relative">
       {/* Header */}
-      <header className="sticky top-0 z-30 bg-black/80 backdrop-blur-sm px-4 py-6 sm:px-6">
+      <header className="sticky top-0 z-30 bg-black/80 backdrop-blur-sm px-4 py-4 sm:py-6 sm:px-6">
         <div className="max-w-[1080px] mx-auto flex items-center justify-between">
-          <div>
+          <div className="flex-1 min-w-0">
             <h1 className="text-white text-2xl sm:text-3xl font-light tracking-[0.1em]">
               Gallery
             </h1>
@@ -342,33 +434,38 @@ export default function GalleryView({ photos, categories }: GalleryViewProps) {
               {displayLabel}
             </p>
           </div>
-          <Link
-            href="/"
-            className="flex items-center gap-2 text-white/70 hover:text-white text-base sm:text-lg font-light tracking-wide transition-colors"
-          >
-            <svg
-              width="20"
-              height="20"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className="sm:w-6 sm:h-6"
+
+          {/* Audio Player in Header */}
+          <div className="flex items-center gap-4">
+            <AudioPlayer />
+            <Link
+              href="/"
+              className="flex items-center gap-2 text-white/70 hover:text-white text-base sm:text-lg font-light tracking-wide transition-colors"
             >
-              <path d="M19 12H5M12 19l-7-7 7-7" />
-            </svg>
-            <span className="hidden sm:inline">Back</span>
-          </Link>
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="sm:w-6 sm:h-6"
+              >
+                <path d="M19 12H5M12 19l-7-7 7-7" />
+              </svg>
+              <span className="hidden sm:inline">Back</span>
+            </Link>
+          </div>
         </div>
       </header>
 
       {/* Category Pills */}
-      <div className="sticky top-[88px] sm:top-[96px] z-30 bg-black/80 backdrop-blur-sm px-4 py-3 sm:px-6 overflow-x-auto scrollbar-hide">
+      <div className="sticky top-[72px] sm:top-[88px] z-30 bg-black/80 backdrop-blur-sm px-4 py-3 sm:px-6 overflow-x-auto scrollbar-hide">
         <div className="max-w-[1080px] mx-auto flex gap-2 flex-nowrap">
           <button
-            onClick={() => setSelectedCategory(null)}
+            onClick={() => handleCategoryChange(null)}
             className={`px-4 py-1.5 rounded-full text-sm whitespace-nowrap transition-all ${
               selectedCategory === null
                 ? "bg-white text-black"
@@ -380,7 +477,7 @@ export default function GalleryView({ photos, categories }: GalleryViewProps) {
           {categories.map((category) => (
             <button
               key={category}
-              onClick={() => setSelectedCategory(category)}
+              onClick={() => handleCategoryChange(category)}
               className={`px-4 py-1.5 rounded-full text-sm whitespace-nowrap transition-all ${
                 selectedCategory === category
                   ? "bg-white text-black"
@@ -405,7 +502,10 @@ export default function GalleryView({ photos, categories }: GalleryViewProps) {
 
         {/* Infinite scroll sentinel */}
         {hasMore && (
-          <div ref={sentinelRef} className="h-20 flex items-center justify-center">
+          <div
+            ref={sentinelRef}
+            className="h-20 flex items-center justify-center"
+          >
             <div className="w-6 h-6 border-2 border-white/30 border-t-white rounded-full animate-spin" />
           </div>
         )}

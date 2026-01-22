@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter, Cormorant_Garamond } from "next/font/google";
 import localFont from "next/font/local";
 import SmoothScroll from "@/components/providers/SmoothScroll";
+import { AudioProvider } from "@/context/AudioContext";
 import "./globals.css";
 
 const inter = Inter({
@@ -61,7 +62,9 @@ export default function RootLayout({
       <body
         className={`${aileron.variable} ${inter.variable} ${cormorant.variable} antialiased bg-background text-foreground`}
       >
-        <SmoothScroll>{children}</SmoothScroll>
+        <AudioProvider>
+          <SmoothScroll>{children}</SmoothScroll>
+        </AudioProvider>
       </body>
     </html>
   );
