@@ -125,7 +125,8 @@ export default async function InfoPage() {
               Built With
             </h2>
             <p className="text-white/70 text-base sm:text-lg font-light leading-relaxed">
-              This website was crafted with the following technologies.
+              This website was crafted with the following technologies. The
+              background music was generated using Suno AI.
             </p>
             <div className="flex flex-wrap justify-center gap-3 pt-2">
               {[
@@ -133,6 +134,7 @@ export default async function InfoPage() {
                 { name: "Vercel", href: "https://vercel.com" },
                 { name: "Claude Code", href: "https://claude.ai" },
                 { name: "Uploadthing", href: "https://uploadthing.com" },
+                { name: "Suno AI", href: "https://suno.com" },
               ].map((tech) => (
                 <a
                   key={tech.name}
